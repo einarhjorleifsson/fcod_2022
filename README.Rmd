@@ -1,0 +1,151 @@
+---
+output: github_document
+---
+
+## fcod alternative assessment
+
+* Drop age 1 in the input data
+* Use default sam settings - at least in the base run
+
+Running stuff:
+
+* The code for the assessment run is found in R/fcod_base.R
+* The results are in run:
+  * fit.rds
+  * retro.rds
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r}
+library(tidyverse)
+# remotes::install_github("einarhjorleifsson/fishivce")
+library(fishvice)
+
+# The NWWG 2022 fall run (not to be confused with the ipb)
+fit.nwwg2022 <- sam_get_fit("Cod_27_5b1")
+rbx.nwwg2022 <- sam_rbx(fit.nwwg2022)
+opr.nwwg2022 <-
+  rbx.nwwg2022$opr |>
+  mutate(fleet = case_when(str_sub(fleet, 1, 2) == "SP" ~ "spring",
+                           str_sub(fleet, 1, 2) == "SU" ~ "summer",
+                           TRUE ~ fleet),
+         o = exp(o),
+         p = exp(p))
+
+# base run:
+fit <- read_rds("run/fit.rds")
+retro <- read_rds("run/retro.rds")
+rbx <- sam_rbx(fit)
+rby <- 
+  rbx$rby |> 
+  mutate(year = ifelse(variable == "rec", year - 1, year))
+rbya <-
+  rbx$rbya |>
+  mutate(yc = year - age)
+rbya.wide <- 
+  rbya |> 
+  select(-yc) |> 
+  spread(variable, val)
+opr <-
+  rbx$opr |>
+  mutate(fleet = case_when(str_sub(fleet, 1, 2) == "SP" ~ "spring",
+                           str_sub(fleet, 1, 2) == "SU" ~ "summer",
+                           TRUE ~ fleet),
+         o = exp(o),
+         p = exp(p))
+
+# base retro:
+retro <- read_rds("run/retro.rds")
+assyears <- 2021 - 0:(length(retro) - 1)
+rby.retro <- map(retro, sam_rby)
+rbya.retro <- map(retro, sam_rbya)
+opr.retro <- map(retro, sam_opr)
+names(rby.retro)  <- names(rbya.retro) <- names(opr.retro) <- assyears
+
+rby.retro <- 
+  bind_rows(rby.retro, .id = "assyear") |> 
+  mutate(assyear = as.integer(assyear)) |> 
+  bind_rows(sam_rby(fit) |> mutate(assyear = 2022L))
+```
+
+## The problem
+
+```{r}
+opr.nwwg2022 |> 
+  filter(fleet %in% c("spring", "summer")) |> 
+  mutate(yc = year - age) |> 
+  arrange(fleet, yc, age) |> 
+  group_by(fleet, yc) |> 
+  mutate(logU = log(o / lead(o))) |> 
+  ungroup() |> 
+  filter(age == 1) |> 
+  ggplot(aes(year, logU)) +
+  geom_point() +
+  geom_smooth(span = 0.999) +
+  facet_wrap(~ fleet, scales = "free_y") +
+  labs(x = NULL, y = "Log catch ratio of age 1 vs 2")
+```
+
+## One solution
+
+```{r}
+rby.retro |> 
+  filter(variable != "catch",
+         year > 2000) |> 
+  ggplot(aes(year, est, group = assyear)) +
+  geom_line() +
+  facet_wrap(~ variable, scales = "free_y")
+rby.retro <- 
+  rby.retro |> 
+  left_join(sam_rby(fit) |> select(year, est2022 = est, variable)) |> 
+  mutate(p = log(est / est2022)) |> 
+  filter(variable != "catch",
+         year > 2000)
+bias <- 
+  rby.retro |> 
+  filter(between(year, 2005, 2018),
+         year == assyear) |> 
+  group_by(variable) |> 
+  summarise(y1 = min(year),
+            y2 = max(year),
+            sd = sd(p),
+            p = mean(p))
+```
+
+
+```{r fig.height = 8}
+ggplot() +
+  annotate("rect", xmin = 2000, xmax = 2023, ymin = -0.2, ymax = 0.2, fill = "pink") +
+  geom_hline(yintercept = 0, colour = "white") +
+  geom_segment(data = bias,
+              aes(x = y1, xend = y2, y = p, yend = p),
+              colour = "blue",
+              lwd = 2) +
+  geom_point(data = rby.retro |> filter(year == assyear),
+             aes(year, p),
+             colour = "red") +
+  scale_x_continuous(limits = c(2000, 2023)) +
+  geom_line(data = rby.retro,
+            aes(year, p, group = assyear)) +
+
+  facet_wrap(~ variable, scales = "free_y") +
+  #scale_x_continuous(breaks = seq(2000, 2024, by = 2)) +
+  scale_y_continuous(breaks = seq(-3, 3, by = 0.2)) +
+  labs(x = NULL, y = "cv proxy")
+```
+
+## Caveats
+
+* We still have some problems, but they are less than what we have seen at the NWWG 2022 fall meeting.
+  * Should be able to ameleorate some of them with some addition tweeking
+
+## Session info
+
+```{r}
+devtools::session_info()
+```
+
