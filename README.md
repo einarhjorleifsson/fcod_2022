@@ -67,6 +67,11 @@ rby.retro <-
 
 ## The problem
 
+- increasing M between age 1 and 2
+- change in distribution between age 1 and 2, affecting q
+- change in survey gear design, affecting q
+- … some other narrowfjord tails
+
 ``` r
 opr.nwwg2022 |> 
   filter(fleet %in% c("spring", "summer")) |> 
@@ -86,6 +91,8 @@ opr.nwwg2022 |>
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
 ## One solution
+
+- drop age 1 alltogether from the model information space
 
 ``` r
 rby.retro |> 
