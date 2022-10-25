@@ -67,9 +67,12 @@ rby.retro <-
 
 ## The problem
 
+Increasing log catch ratios of ages 1 and 2 over time - ages that hardly
+are fished. Potential reasons:
+
 - increasing M between age 1 and 2
-- change in distribution between age 1 and 2, affecting q
-- change in survey gear design, affecting q
+- change in distribution between age 1 and 2, affecting q (availability)
+- change in survey gear design, affecting q (selectivity)
 - … some other narrowfjord tails
 
 ``` r
@@ -90,7 +93,7 @@ opr.nwwg2022 |>
 
 ![](README_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
-## One solution
+## One remedy
 
 - drop age 1 alltogether from the model information space
 
